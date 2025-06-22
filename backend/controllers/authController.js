@@ -67,7 +67,7 @@ exports.login = async (req, res, next) => {
     let user;
     try {
       user = await User.findOne({ where: { email } });
-      debug('User query completed');
+      debug('User query result:', user ? 'Found' : 'Not found');
     } catch (dbError) {
       console.error('Database error during login:', dbError);
       debug('Database error during login:', dbError);
@@ -78,18 +78,22 @@ exports.login = async (req, res, next) => {
     }
     
     if (!user) {
-      debug('No user found with this email');
+      debug(`No user found with email: ${email}`);
       return res.status(401).json({
         success: false,
         message: 'Email atau password salah'
       });
     }
     
+    // Extra logging to help troubleshoot
+    debug('User found:', { id: user.id, email: user.email, role: user.role });
+    
     // Check if password matches
     let isMatch = false;
     try {
+      debug('Comparing passwords...');
       isMatch = await user.matchPassword(password);
-      debug('Password verification completed');
+      debug('Password match result:', isMatch);
     } catch (pwError) {
       console.error('Password verification error:', pwError);
       debug('Password verification error:', pwError);
@@ -100,7 +104,7 @@ exports.login = async (req, res, next) => {
     }
     
     if (!isMatch) {
-      debug('Password does not match');
+      debug('Password does not match for user:', email);
       return res.status(401).json({
         success: false,
         message: 'Email atau password salah'
@@ -109,7 +113,7 @@ exports.login = async (req, res, next) => {
     
     // Check if user is active
     if (!user.isActive) {
-      debug('User account is inactive');
+      debug('User account is inactive:', email);
       return res.status(401).json({
         success: false,
         message: 'Akun anda tidak aktif'
@@ -119,7 +123,7 @@ exports.login = async (req, res, next) => {
     // Generate token
     const token = generateToken(user.id);
     
-    debug('Login successful');
+    debug('Login successful for:', email);
     res.json({
       success: true,
       token,
@@ -131,6 +135,7 @@ exports.login = async (req, res, next) => {
       }
     });
   } catch (error) {
+    console.error('Unhandled login error:', error);
     debug('Unhandled login error:', error);
     next(error);
   }
