@@ -12,6 +12,8 @@ const AcademicYear = sequelize.define('AcademicYear', {
     type: DataTypes.BOOLEAN,
     defaultValue: false
   }
+}, {
+  tableName: 'AcademicYears'  // Make sure this matches
 });
 
 // Jalur masuk
@@ -24,6 +26,8 @@ const AdmissionPath = sequelize.define('AdmissionPath', {
   description: {
     type: DataTypes.TEXT
   }
+}, {
+  tableName: 'AdmissionPaths'  // Make sure this matches
 });
 
 // Fakultas
@@ -36,6 +40,8 @@ const Faculty = sequelize.define('Faculty', {
     type: DataTypes.STRING,
     allowNull: true
   }
+}, {
+  tableName: 'Faculties'  // Make sure this matches
 });
 
 // Program studi
@@ -44,6 +50,8 @@ const Program = sequelize.define('Program', {
     type: DataTypes.STRING,
     allowNull: false
   }
+}, {
+  tableName: 'Programs'  // Make sure this matches
 });
 
 // Statistik penerimaan
@@ -80,6 +88,8 @@ const AdmissionStatistics = sequelize.define('AdmissionStatistics', {
     type: DataTypes.INTEGER,
     defaultValue: 0
   }
+}, {
+  tableName: 'AdmissionStatistics'  // Make sure this matches
 });
 
 // Relasi

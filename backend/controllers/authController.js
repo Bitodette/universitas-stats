@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const config = require('../config/config');
+const { debug } = require('../utils/debugger');
 
 // Generate JWT token
 const generateToken = (id) => {
@@ -48,6 +49,7 @@ exports.register = async (req, res, next) => {
       }
     });
   } catch (error) {
+    debug('Registration error:', error);
     next(error);
   }
 };
@@ -59,12 +61,16 @@ exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
     
+    debug(`Login attempt for email: ${email}`);
+    
     // Check for user
     let user;
     try {
       user = await User.findOne({ where: { email } });
+      debug('User query completed');
     } catch (dbError) {
       console.error('Database error during login:', dbError);
+      debug('Database error during login:', dbError);
       return res.status(500).json({
         success: false,
         message: 'Database connection failed. Please try again later.'
@@ -72,6 +78,7 @@ exports.login = async (req, res, next) => {
     }
     
     if (!user) {
+      debug('No user found with this email');
       return res.status(401).json({
         success: false,
         message: 'Email atau password salah'
@@ -79,9 +86,21 @@ exports.login = async (req, res, next) => {
     }
     
     // Check if password matches
-    const isMatch = await user.matchPassword(password);
+    let isMatch = false;
+    try {
+      isMatch = await user.matchPassword(password);
+      debug('Password verification completed');
+    } catch (pwError) {
+      console.error('Password verification error:', pwError);
+      debug('Password verification error:', pwError);
+      return res.status(500).json({
+        success: false,
+        message: 'Authentication error. Please try again later.'
+      });
+    }
     
     if (!isMatch) {
+      debug('Password does not match');
       return res.status(401).json({
         success: false,
         message: 'Email atau password salah'
@@ -90,6 +109,7 @@ exports.login = async (req, res, next) => {
     
     // Check if user is active
     if (!user.isActive) {
+      debug('User account is inactive');
       return res.status(401).json({
         success: false,
         message: 'Akun anda tidak aktif'
@@ -99,6 +119,7 @@ exports.login = async (req, res, next) => {
     // Generate token
     const token = generateToken(user.id);
     
+    debug('Login successful');
     res.json({
       success: true,
       token,
@@ -110,6 +131,7 @@ exports.login = async (req, res, next) => {
       }
     });
   } catch (error) {
+    debug('Unhandled login error:', error);
     next(error);
   }
 };
@@ -135,6 +157,7 @@ exports.getMe = async (req, res, next) => {
       data: user
     });
   } catch (error) {
+    debug('Error fetching user profile:', error);
     next(error);
   }
 };

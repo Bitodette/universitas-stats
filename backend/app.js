@@ -45,8 +45,12 @@ app.get('/api/debug', (req, res) => {
   const envInfo = {
     nodeEnv: process.env.NODE_ENV,
     isVercel: !!process.env.VERCEL,
-    dbHost: process.env.DB_HOST,
+    dbHost: process.env.DB_HOST || 'not set',
+    dbPort: process.env.DB_PORT || 'not set',
+    hasDBUser: !!process.env.DB_USER,
     hasDBPassword: !!process.env.DB_PASSWORD,
+    hasDBName: !!process.env.DB_NAME,
+    hasDbUrl: !!process.env.DATABASE_URL,
     hasJwtSecret: !!process.env.JWT_SECRET
   };
   

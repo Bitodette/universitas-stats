@@ -15,41 +15,15 @@ try {
     env: config.env
   });
 
+  // Check if running in Vercel
+  const isVercel = process.env.VERCEL === '1';
+  debug(`Running in Vercel: ${isVercel}`);
+
   // Explicitly try to require pg to catch the error early with a better message
   require('pg');
   
-  const dbConfig = {
-    host: config.db.host,
-    dialect: 'postgres',
-    logging: config.env === 'development' ? console.log : false,
-    pool: {
-      max: 2, // Reduced for serverless environment
-      min: 0,
-      acquire: 30000,
-      idle: 10000
-    }
-  };
-  
-  // Add SSL for production
-  if (config.env === 'production') {
-    debug('Adding SSL configuration for production');
-    dbConfig.dialectOptions = {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false
-      }
-    };
-  }
-  
-  sequelize = new Sequelize(
-    config.db.database,
-    config.db.username,
-    config.db.password,
-    dbConfig
-  );
-  
-  // Alternative connection method using connection URI if available
-  if (process.env.DATABASE_URL && config.env === 'production') {
+  // First try using DATABASE_URL if available, especially for Vercel deployment
+  if (process.env.DATABASE_URL) {
     debug('Using DATABASE_URL for connection');
     sequelize = new Sequelize(process.env.DATABASE_URL, {
       dialect: 'postgres',
@@ -58,10 +32,52 @@ try {
         ssl: {
           require: true,
           rejectUnauthorized: false
-        }
+        },
+        keepAlive: true
       },
-      logging: false
+      logging: false,
+      pool: {
+        max: 3,
+        min: 0,
+        acquire: 30000,
+        idle: 10000,
+        evict: 1000
+      }
     });
+  } else {
+    // Otherwise use individual config parameters
+    const dbConfig = {
+      host: config.db.host,
+      dialect: 'postgres',
+      logging: config.env === 'development' ? console.log : false,
+      // Improve connection pooling for serverless environment
+      pool: {
+        max: 3,
+        min: 0,
+        acquire: 30000,
+        idle: 10000,
+        evict: 1000
+      }
+    };
+    
+    // Add SSL for production
+    if (config.env === 'production') {
+      debug('Adding SSL configuration for production');
+      dbConfig.dialectOptions = {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false
+        },
+        keepAlive: true
+      };
+    }
+    
+    sequelize = new Sequelize(
+      config.db.database,
+      config.db.username,
+      config.db.password,
+      dbConfig
+    );
   }
 } catch (error) {
   console.error('Error initializing Sequelize:', error.message);
@@ -92,4 +108,5 @@ const connectDB = async () => {
   }
 };
 
+module.exports = { sequelize, connectDB };
 module.exports = { sequelize, connectDB };
