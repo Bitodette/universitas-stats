@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const { errorHandler } = require('./middleware/errorHandler');
+const errorLogger = require('./utils/errorLogger');
 
 // Routes
 const statisticsRoutes = require('./routes/statisticsRoutes');
@@ -20,6 +21,15 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
+// Health check endpoint that doesn't require database
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Routes
 app.use('/api/statistics', statisticsRoutes);
 app.use('/api/auth', authRoutes);
@@ -31,8 +41,11 @@ app.get('/', (req, res) => {
   res.send('API untuk Universitas Statistik berjalan...');
 });
 
-// Error handler
-app.use(errorHandler);
+// Custom error handler with improved logging
+app.use((err, req, res, next) => {
+  errorLogger(err);
+  errorHandler(err, req, res, next);
+});
 
 // Handle 404
 app.use((req, res) => {

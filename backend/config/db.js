@@ -9,8 +9,14 @@ const sequelize = new Sequelize(
     host: config.db.host,
     dialect: 'postgres',
     logging: config.env === 'development' ? console.log : false,
+    dialectOptions: {
+      ssl: config.env === 'production' ? {
+        require: true,
+        rejectUnauthorized: false
+      } : false
+    },
     pool: {
-      max: 5,
+      max: 2, // Reduced for serverless environment
       min: 0,
       acquire: 30000,
       idle: 10000
@@ -24,7 +30,10 @@ const connectDB = async () => {
     console.log('Database terhubung berhasil!');
   } catch (error) {
     console.error('Gagal terhubung ke database:', error);
-    process.exit(1);
+    // Don't exit in production as it crashes serverless function
+    if (process.env.NODE_ENV !== 'production') {
+      process.exit(1);
+    }
   }
 };
 
