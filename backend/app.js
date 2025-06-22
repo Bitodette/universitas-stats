@@ -1,8 +1,12 @@
 const express = require('express');
 const cors = require('cors');
-const morgan = require('morgan');
-const { errorHandler } = require('./middleware/errorHandler');
-const errorLogger = require('./utils/errorLogger');
+// Handle morgan import more gracefully
+let morgan;
+try {
+  morgan = require('morgan');
+} catch (err) {
+  console.warn('Morgan logger not available, continuing without request logging');
+}
 
 // Routes
 const statisticsRoutes = require('./routes/statisticsRoutes');
@@ -17,7 +21,7 @@ app.use(express.json());
 app.use(cors());
 
 // Logging in development mode
-if (process.env.NODE_ENV === 'development') {
+if (process.env.NODE_ENV === 'development' && morgan) {
   app.use(morgan('dev'));
 }
 
@@ -43,7 +47,12 @@ app.get('/', (req, res) => {
 
 // Custom error handler with improved logging
 app.use((err, req, res, next) => {
-  errorLogger(err);
+  console.error('ERROR:', err.message);
+  if (err.stack) {
+    console.error(err.stack);
+  }
+  
+  const { errorHandler } = require('./middleware/errorHandler');
   errorHandler(err, req, res, next);
 });
 
