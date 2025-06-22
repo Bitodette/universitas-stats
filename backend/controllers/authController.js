@@ -60,7 +60,16 @@ exports.login = async (req, res, next) => {
     const { email, password } = req.body;
     
     // Check for user
-    const user = await User.findOne({ where: { email } });
+    let user;
+    try {
+      user = await User.findOne({ where: { email } });
+    } catch (dbError) {
+      console.error('Database error during login:', dbError);
+      return res.status(500).json({
+        success: false,
+        message: 'Database connection failed. Please try again later.'
+      });
+    }
     
     if (!user) {
       return res.status(401).json({

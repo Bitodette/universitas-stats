@@ -1,6 +1,14 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// Determine if we're running in production
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Use the appropriate API URL
+const API_URL = isProduction 
+  ? 'https://universitas-stats.vercel.app/api' 
+  : 'http://localhost:5000/api';
+
+console.log('Using API URL:', API_URL);
 
 // Create axios instance
 const api = axios.create({
@@ -21,5 +29,27 @@ api.interceptors.request.use(
   },
   (error) => Promise.reject(error)
 );
+
+// Add response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.message === 'Network Error') {
+      console.error('API connection failed. Please check if the API server is running.');
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Function to validate API connection
+export const validateApiConnection = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/health`, { timeout: 5000 });
+    return response.data.status === 'ok';
+  } catch (error) {
+    console.error('API health check failed:', error.message);
+    return false;
+  }
+};
 
 export default api;

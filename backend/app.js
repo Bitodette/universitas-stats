@@ -56,6 +56,25 @@ app.get('/api/debug', (req, res) => {
   });
 });
 
+// API base route
+app.get('/api', (req, res) => {
+  debug('API base endpoint called');
+  res.json({
+    success: true,
+    message: 'Universitas Statistics API',
+    version: '1.0',
+    endpoints: {
+      statistics: '/api/statistics',
+      auth: '/api/auth',
+      faculties: '/api/faculties',
+      admissionPaths: '/api/admission-paths',
+      health: '/api/health',
+      debug: '/api/debug'
+    },
+    documentation: 'See documentation for more details on API usage'
+  });
+});
+
 // Routes
 app.use('/api/statistics', statisticsRoutes);
 app.use('/api/auth', authRoutes);
