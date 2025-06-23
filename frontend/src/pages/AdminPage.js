@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { StatisticsContext } from '../context/StatisticsContext';
 import api from '../services/api';
 
 const AdminPage = () => {
-  const { years, loading: yearsLoading } = useContext(StatisticsContext);
+  const { years, loading: yearsLoading, refreshYears } = useContext(StatisticsContext);
   const [faculties, setFaculties] = useState([]);
   const [programs, setPrograms] = useState([]);
   const [admissionPaths, setAdmissionPaths] = useState([]);
@@ -12,14 +12,16 @@ const AdminPage = () => {
     academicYearId: '',
     programId: '',
     admissionPathId: '',
-    totalApplicants: 0,
-    maleApplicants: 0,
-    femaleApplicants: 0,
-    totalAccepted: 0,
-    maleAccepted: 0,
-    femaleAccepted: 0,
-    kipApplicants: 0,
-    kipRecipients: 0
+    totalApplicants: '',
+    maleApplicants: '',
+    femaleApplicants: '',
+    totalAccepted: '',
+    maleAccepted: '',
+    femaleAccepted: '',
+    kipApplicants: '',
+    kipRecipients: '',
+    registeredDocs: '',
+    registeredPayment: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -29,6 +31,19 @@ const AdminPage = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editId, setEditId] = useState(null);
   const [refreshData, setRefreshData] = useState(0);
+  
+  // Year modal state
+  const [yearModalOpen, setYearModalOpen] = useState(false);
+  const [newYear, setNewYear] = useState('');
+  const [isActive, setIsActive] = useState(false);
+
+  // Add a ref to keep track of the active input
+  const activeInputRef = useRef(null);
+  
+  // Add new state for selected entries
+  const [selectedEntries, setSelectedEntries] = useState([]);
+  const [selectAll, setSelectAll] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -73,6 +88,23 @@ const AdminPage = () => {
     fetchPrograms();
   }, [selectedFacultyId]);
 
+  // Effect to restore focus after render
+  useEffect(() => {
+    if (activeInputRef.current) {
+      const element = document.getElementById(activeInputRef.current);
+      if (element) {
+        element.focus();
+        
+        // Restore cursor position to the end of input only for text inputs
+        // number input types don't support setSelectionRange
+        if (element.type === 'text') {
+          const valueLength = element.value.length;
+          element.setSelectionRange(valueLength, valueLength);
+        }
+      }
+    }
+  }, [formData]);
+
   const handleFacultyChange = (e) => {
     setSelectedFacultyId(e.target.value);
     setFormData({
@@ -82,11 +114,15 @@ const AdminPage = () => {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, id } = e.target;
+    
+    // Save the current focused input id
+    activeInputRef.current = id;
+    
     setFormData({
       ...formData,
       [name]: name.includes('total') || name.includes('male') || name.includes('female') || name.includes('kip')
-        ? parseInt(value) || 0
+        ? value === '' ? '' : parseInt(value) || 0
         : value
     });
   };
@@ -96,23 +132,110 @@ const AdminPage = () => {
     if (!formData.programId) return 'Pilih program studi';
     if (!formData.admissionPathId) return 'Pilih jalur masuk';
     
-    if (formData.maleApplicants + formData.femaleApplicants !== formData.totalApplicants) {
+    // Convert empty strings to zero for validation
+    const totalApplicants = formData.totalApplicants === '' ? 0 : formData.totalApplicants;
+    const maleApplicants = formData.maleApplicants === '' ? 0 : formData.maleApplicants;
+    const femaleApplicants = formData.femaleApplicants === '' ? 0 : formData.femaleApplicants;
+    const totalAccepted = formData.totalAccepted === '' ? 0 : formData.totalAccepted;
+    const maleAccepted = formData.maleAccepted === '' ? 0 : formData.maleAccepted;
+    const femaleAccepted = formData.femaleAccepted === '' ? 0 : formData.femaleAccepted;
+    const kipApplicants = formData.kipApplicants === '' ? 0 : formData.kipApplicants;
+    const kipRecipients = formData.kipRecipients === '' ? 0 : formData.kipRecipients;
+    
+    if (maleApplicants + femaleApplicants !== totalApplicants) {
       return 'Total pendaftar harus sama dengan jumlah pendaftar laki-laki dan perempuan';
     }
     
-    if (formData.maleAccepted + formData.femaleAccepted !== formData.totalAccepted) {
+    if (maleAccepted + femaleAccepted !== totalAccepted) {
       return 'Total diterima harus sama dengan jumlah diterima laki-laki dan perempuan';
     }
     
-    if (formData.totalAccepted > formData.totalApplicants) {
+    if (totalAccepted > totalApplicants) {
       return 'Total diterima tidak boleh lebih besar dari total pendaftar';
     }
     
-    if (formData.kipRecipients > formData.kipApplicants) {
+    // Enhanced KIP validation
+    if (kipApplicants > totalApplicants) {
+      return 'Pendaftar KIP tidak boleh lebih besar dari total pendaftar';
+    }
+    
+    if (kipRecipients > kipApplicants) {
       return 'Penerima KIP tidak boleh lebih besar dari pendaftar KIP';
     }
     
     return null;
+  };
+
+  // Add this new function to validate the year input
+  const validateYear = (yearStr) => {
+    const currentYear = new Date().getFullYear();
+    const yearNum = parseInt(yearStr, 10);
+    
+    if (!yearStr.trim()) {
+      return 'Tahun akademik wajib diisi';
+    }
+    
+    if (isNaN(yearNum)) {
+      return 'Tahun akademik harus berupa angka';
+    }
+    
+    if (yearNum < 2000 || yearNum > currentYear + 10) {
+      return `Tahun akademik harus antara 2000 dan ${currentYear + 10}`;
+    }
+    
+    // Check if year already exists in the list
+    if (years.some(y => y.year === yearStr)) {
+      return `Tahun akademik ${yearStr} sudah ada`;
+    }
+    
+    return null;
+  };
+
+  // Modify the handleCreateYear function to include better error handling
+  const handleCreateYear = async (e) => {
+    e.preventDefault();
+    
+    // Validate the year input
+    const validationError = validateYear(newYear);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await api.post('/academic-years', {
+        year: newYear,
+        isActive
+      });
+      
+      // Add a log to see what was returned
+      console.log('Year creation response:', response);
+      
+      setSuccess(`Tahun akademik ${newYear} berhasil ditambahkan`);
+      setYearModalOpen(false);
+      setNewYear('');
+      setIsActive(false);
+      
+      // Refresh the years data in the context with await to ensure it completes
+      await refreshYears();
+      
+      // Wait for a moment then clear success message
+      setTimeout(() => setSuccess(null), 5000);
+    } catch (err) {
+      console.error('Error adding academic year:', err);
+      
+      // More detailed error message extraction
+      const errorMessage = err.response?.data?.message || 
+                           err.message || 
+                           'Gagal menambahkan tahun akademik';
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -124,16 +247,24 @@ const AdminPage = () => {
       return;
     }
     
+    // Convert empty strings to 0 before sending to the API
+    const dataToSubmit = { ...formData };
+    ['totalApplicants', 'maleApplicants', 'femaleApplicants', 
+     'totalAccepted', 'maleAccepted', 'femaleAccepted', 
+     'kipApplicants', 'kipRecipients', 'registeredDocs', 'registeredPayment'].forEach(field => {
+      dataToSubmit[field] = dataToSubmit[field] === '' ? 0 : dataToSubmit[field];
+    });
+    
     setLoading(true);
     setError(null);
     setSuccess(null);
     
     try {
       if (isEditMode && editId) {
-        await api.put(`/statistics/${editId}`, formData);
+        await api.put(`/statistics/${editId}`, dataToSubmit);
         setSuccess('Data statistik berhasil diperbarui');
       } else {
-        await api.post('/statistics', formData);
+        await api.post('/statistics', dataToSubmit);
         setSuccess('Data statistik berhasil ditambahkan');
       }
       
@@ -142,14 +273,16 @@ const AdminPage = () => {
         academicYearId: '',
         programId: '',
         admissionPathId: '',
-        totalApplicants: 0,
-        maleApplicants: 0,
-        femaleApplicants: 0,
-        totalAccepted: 0,
-        maleAccepted: 0,
-        femaleAccepted: 0,
-        kipApplicants: 0,
-        kipRecipients: 0
+        totalApplicants: '',
+        maleApplicants: '',
+        femaleApplicants: '',
+        totalAccepted: '',
+        maleAccepted: '',
+        femaleAccepted: '',
+        kipApplicants: '',
+        kipRecipients: '',
+        registeredDocs: '',
+        registeredPayment: ''
       });
       setSelectedFacultyId('');
       setIsEditMode(false);
@@ -174,7 +307,9 @@ const AdminPage = () => {
       maleAccepted: entry.maleAccepted,
       femaleAccepted: entry.femaleAccepted,
       kipApplicants: entry.kipApplicants,
-      kipRecipients: entry.kipRecipients
+      kipRecipients: entry.kipRecipients,
+      registeredDocs: entry.registeredDocs,
+      registeredPayment: entry.registeredPayment
     });
     
     // Set faculty ID from program
@@ -191,14 +326,204 @@ const AdminPage = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Anda yakin ingin menghapus data ini?')) {
       try {
+        setLoading(true);
         await api.delete(`/statistics/${id}`);
         setRefreshData(prev => prev + 1);
         setSuccess('Data berhasil dihapus');
       } catch (err) {
         setError(err.response?.data?.message || 'Gagal menghapus data');
+      } finally {
+        setLoading(false);
       }
     }
   };
+
+  // Handle selecting/deselecting a single entry
+  const handleSelectEntry = (id) => {
+    setSelectedEntries(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(entryId => entryId !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  // Handle select all checkbox
+  const handleSelectAll = () => {
+    if (selectAll) {
+      // If already all selected, deselect all
+      setSelectedEntries([]);
+    } else {
+      // Select all entries
+      setSelectedEntries(entries.map(entry => entry.id));
+    }
+    setSelectAll(!selectAll);
+  };
+
+  // Effect to update selectAll state when selectedEntries changes
+  useEffect(() => {
+    if (entries.length > 0 && selectedEntries.length === entries.length) {
+      setSelectAll(true);
+    } else {
+      setSelectAll(false);
+    }
+  }, [selectedEntries, entries]);
+
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    if (selectedEntries.length === 0) {
+      setError('Tidak ada data yang dipilih');
+      return;
+    }
+
+    const message = selectedEntries.length === 1
+      ? 'Anda yakin ingin menghapus 1 data yang dipilih?'
+      : `Anda yakin ingin menghapus ${selectedEntries.length} data yang dipilih?`;
+
+    if (window.confirm(message)) {
+      try {
+        setIsBulkDeleting(true);
+        setLoading(true);
+        
+        // Delete entries one by one
+        for (const id of selectedEntries) {
+          await api.delete(`/statistics/${id}`);
+        }
+        
+        setRefreshData(prev => prev + 1);
+        setSuccess(`${selectedEntries.length} data berhasil dihapus`);
+        setSelectedEntries([]);
+      } catch (err) {
+        setError(err.response?.data?.message || 'Gagal menghapus data');
+      } finally {
+        setLoading(false);
+        setIsBulkDeleting(false);
+      }
+    }
+  };
+
+  // Year modal component
+  const YearModal = () => {
+    if (!yearModalOpen) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <h3 className="text-lg font-semibold mb-4">Tambah Tahun Akademik</h3>
+          
+          {error && (
+            <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded">
+              <p>{error}</p>
+            </div>
+          )}
+          
+          <form onSubmit={handleCreateYear}>
+            <div className="mb-4">
+              <label htmlFor="newYear" className="block text-sm font-medium text-gray-700 mb-1">
+                Tahun Akademik:
+              </label>
+              <input
+                type="text"
+                id="newYear"
+                value={newYear}
+                onChange={(e) => {
+                  setNewYear(e.target.value);
+                  setError(null); // Clear error when user types
+                }}
+                placeholder="contoh: 2025"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                maxLength="4"
+                pattern="[0-9]*"
+                autoFocus
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">Masukkan tahun dalam format 4 digit (misal: 2025)</p>
+            </div>
+            
+            <div className="mb-4">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={isActive}
+                  onChange={(e) => setIsActive(e.target.checked)}
+                  className="mr-2"
+                />
+                <span className="text-sm text-gray-700">Set sebagai tahun aktif</span>
+              </label>
+              {isActive && (
+                <p className="text-xs text-gray-500 mt-1 pl-5">
+                  Catatan: Ini akan menonaktifkan tahun aktif yang ada sebelumnya
+                </p>
+              )}
+            </div>
+            
+            <div className="flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setYearModalOpen(false);
+                  setError(null);
+                  setNewYear('');
+                  setIsActive(false);
+                }}
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none disabled:bg-blue-400 disabled:cursor-not-allowed"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 align-middle"></span>
+                    Menyimpan...
+                  </>
+                ) : (
+                  'Simpan'
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  // Add the button to open year modal
+  const renderYearSelect = () => (
+    <div>
+      <label htmlFor="academicYearId" className="block text-sm font-medium text-gray-700 mb-1">
+        Tahun Akademik:
+      </label>
+      <div className="flex space-x-2">
+        <select
+          id="academicYearId"
+          name="academicYearId"
+          value={formData.academicYearId}
+          onChange={handleChange}
+          className="flex-grow border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          required
+        >
+          <option value="">Pilih Tahun</option>
+          {years.map(year => (
+            <option key={year.id} value={year.id}>
+              {year.year}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => setYearModalOpen(true)}
+          className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
 
   if (yearsLoading) {
     return (
@@ -211,6 +536,9 @@ const AdminPage = () => {
   return (
     <div className="container mx-auto px-4 py-6">
       <h1 className="text-3xl font-bold text-gray-800 mb-8">Admin Panel</h1>
+      
+      {/* Add Year Modal */}
+      <YearModal />
       
       <div className="mb-6">
         <div className="border-b border-gray-200">
@@ -263,26 +591,8 @@ const AdminPage = () => {
           
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-              <div>
-                <label htmlFor="academicYearId" className="block text-sm font-medium text-gray-700 mb-1">
-                  Tahun Akademik:
-                </label>
-                <select
-                  id="academicYearId"
-                  name="academicYearId"
-                  value={formData.academicYearId}
-                  onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                >
-                  <option value="">Pilih Tahun</option>
-                  {years.map(year => (
-                    <option key={year.id} value={year.id}>
-                      {year.year}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Replace the academic year select with our new component */}
+              {renderYearSelect()}
               
               <div>
                 <label htmlFor="facultyId" className="block text-sm font-medium text-gray-700 mb-1">
@@ -491,6 +801,43 @@ const AdminPage = () => {
               </div>
             </div>
             
+            <div className="bg-gray-50 p-4 rounded-lg mb-6">
+              <h3 className="text-md font-medium mb-3 text-gray-700">Data Registrasi</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label htmlFor="registeredDocs" className="block text-sm font-medium text-gray-700 mb-1">
+                    Registrasi Berkas:
+                  </label>
+                  <input
+                    type="number"
+                    id="registeredDocs"
+                    name="registeredDocs"
+                    min="0"
+                    value={formData.registeredDocs}
+                    onChange={handleChange}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="registeredPayment" className="block text-sm font-medium text-gray-700 mb-1">
+                    Registrasi UKT:
+                  </label>
+                  <input
+                    type="number"
+                    id="registeredPayment"
+                    name="registeredPayment"
+                    min="0"
+                    value={formData.registeredPayment}
+                    onChange={handleChange}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+            
             <div className="flex justify-end">
               {isEditMode && (
                 <button
@@ -508,7 +855,9 @@ const AdminPage = () => {
                       maleAccepted: 0,
                       femaleAccepted: 0,
                       kipApplicants: 0,
-                      kipRecipients: 0
+                      kipRecipients: 0,
+                      registeredDocs: 0,
+                      registeredPayment: 0
                     });
                     setSelectedFacultyId('');
                     setEditId(null);
@@ -532,7 +881,30 @@ const AdminPage = () => {
       
       {activeTab === 'manage' && (
         <div className="bg-white shadow-md rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-6">Kelola Data Statistik</h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold">Kelola Data Statistik</h2>
+            
+            {/* Bulk Delete Button - Only show when entries are selected */}
+            {selectedEntries.length > 0 && (
+              <button 
+                onClick={handleBulkDelete}
+                disabled={loading || isBulkDeleting}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none disabled:bg-red-400 disabled:cursor-not-allowed flex items-center"
+              >
+                {isBulkDeleting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Menghapus...
+                  </>
+                ) : (
+                  <>Hapus {selectedEntries.length} Item</>
+                )}
+              </button>
+            )}
+          </div>
           
           {entries.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
@@ -543,6 +915,16 @@ const AdminPage = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th scope="col" className="px-2 py-3 text-left">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={selectAll}
+                          onChange={handleSelectAll}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                      </div>
+                    </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Tahun
                     </th>
@@ -565,7 +947,18 @@ const AdminPage = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {entries.map(entry => (
-                    <tr key={entry.id}>
+                    <tr 
+                      key={entry.id}
+                      className={selectedEntries.includes(entry.id) ? "bg-blue-50" : "hover:bg-gray-50"}
+                    >
+                      <td className="px-2 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedEntries.includes(entry.id)}
+                          onChange={() => handleSelectEntry(entry.id)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {entry.AcademicYear?.year}
                       </td>
@@ -591,6 +984,7 @@ const AdminPage = () => {
                         <button 
                           onClick={() => handleDelete(entry.id)} 
                           className="text-red-600 hover:text-red-900"
+                          disabled={loading}
                         >
                           Hapus
                         </button>
@@ -599,6 +993,17 @@ const AdminPage = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+          
+          {/* Selection Summary */}
+          {entries.length > 0 && (
+            <div className="mt-4 text-sm text-gray-500">
+              {selectedEntries.length > 0 ? (
+                <p>{selectedEntries.length} dari {entries.length} item dipilih</p>
+              ) : (
+                <p>0 item dipilih</p>
+              )}
             </div>
           )}
         </div>

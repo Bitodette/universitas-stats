@@ -1,24 +1,22 @@
 import axios from 'axios';
 
-// Determine if we're running in production
-const isProduction = process.env.NODE_ENV === 'production';
+// Determine API URL based on environment
+const API_URL = process.env.REACT_APP_API_URL || 
+                (process.env.NODE_ENV === 'production' 
+                  ? 'https://universitas-stats.vercel.app/api'
+                  : 'http://localhost:5000/api');
 
-// Use the appropriate API URL
-const API_URL = isProduction 
-  ? 'https://universitas-stats.vercel.app/api' 
-  : 'http://localhost:5000/api';
+console.log('API URL:', API_URL);
 
-console.log('Using API URL:', API_URL);
-
-// Create axios instance
 const api = axios.create({
   baseURL: API_URL,
   headers: {
-    'Content-Type': 'application/json'
-  }
+    'Content-Type': 'application/json',
+  },
+  timeout: 15000 // 15 seconds timeout
 });
 
-// Add request interceptor for auth token
+// Add request interceptor to include auth token if available
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -27,16 +25,14 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    return Promise.reject(error);
+  }
 );
 
-// Add response interceptor for error handling
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.message === 'Network Error') {
-      console.error('API connection failed. Please check if the API server is running.');
-    }
     return Promise.reject(error);
   }
 );
@@ -53,3 +49,4 @@ export const validateApiConnection = async () => {
 };
 
 export default api;
+

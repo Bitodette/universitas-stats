@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Always show scrollbar to prevent layout shifts */
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable; /* Modern browsers */
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -9,7 +15,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  @apply bg-gray-50;
+  @apply bg-neutral-100;
 }
 
 code {
@@ -18,5 +24,28 @@ code {
 }
 
 .loader {
-  @apply w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin;
+  @apply w-8 h-8 border-4 border-neutral-200 border-t-primary-600 rounded-full animate-spin;
+}
+
+/* Custom styles for cards */
+.card {
+  @apply bg-white shadow-sm border border-neutral-200 rounded-md transition-shadow hover:shadow-md;
+}
+
+/* Custom styles for charts */
+.chart-container {
+  @apply p-5 bg-white border border-neutral-200 rounded-md;
+}
+
+/* Custom styles for tabs */
+.tab {
+  @apply mr-1 py-2 px-4 text-center border-b-2 font-medium text-sm transition-colors;
+}
+
+.tab-active {
+  @apply border-primary-600 text-primary-700;
+}
+
+.tab-inactive {
+  @apply border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300;
 }

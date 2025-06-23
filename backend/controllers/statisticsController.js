@@ -83,7 +83,13 @@ exports.getYearlyStatistics = async (req, res, next) => {
     
     const facultyStats = faculties.map(faculty => {
       const programIds = faculty.Programs.map(program => program.id);
-      const facultyStats = statistics.filter(stat => programIds.includes(stat.ProgramId));
+      
+      // Fix case sensitivity - use programId instead of ProgramId
+      const facultyStats = statistics.filter(stat => programIds.includes(stat.programId));
+      
+      // Debug: Log the number of stats per faculty
+      console.log(`Faculty ${faculty.name} has ${facultyStats.length} statistics entries`);
+      console.log(`KIP recipients: ${facultyStats.reduce((sum, stat) => sum + stat.kipRecipients, 0)}`);
       
       return {
         facultyId: faculty.id,
@@ -109,13 +115,73 @@ exports.getYearlyStatistics = async (req, res, next) => {
       kipRecipients: statistics.reduce((sum, stat) => sum + stat.kipRecipients, 0)
     };
 
+    // Add registration statistics
+    const registrationStats = {
+      registeredDocs: statistics.reduce((sum, stat) => sum + (stat.registeredDocs || 0), 0),
+      registeredPayment: statistics.reduce((sum, stat) => sum + (stat.registeredPayment || 0), 0)
+    };
+
+    // NEW: Calculate program competitiveness statistics
+    const programs = await Program.findAll({
+      include: [Faculty]
+    });
+    
+    const programCompetitiveness = [];
+    
+    // Group statistics by program
+    const programStatsMap = {};
+    statistics.forEach(stat => {
+      if (!programStatsMap[stat.programId]) {
+        programStatsMap[stat.programId] = {
+          totalApplicants: 0,
+          totalAccepted: 0,
+          programName: stat.Program.name,
+          facultyName: stat.Program.Faculty.name,
+          facultyAbbreviation: stat.Program.Faculty.abbreviation
+        };
+      }
+      
+      programStatsMap[stat.programId].totalApplicants += stat.totalApplicants;
+      programStatsMap[stat.programId].totalAccepted += stat.totalAccepted;
+    });
+    
+    // Calculate competitiveness metrics for each program
+    Object.keys(programStatsMap).forEach(programId => {
+      const stats = programStatsMap[programId];
+      const ratio = stats.totalAccepted > 0 
+        ? (stats.totalApplicants / stats.totalAccepted).toFixed(2) 
+        : null;
+        
+      const acceptanceRate = stats.totalApplicants > 0 
+        ? ((stats.totalAccepted / stats.totalApplicants) * 100).toFixed(2) 
+        : null;
+        
+      programCompetitiveness.push({
+        programId,
+        programName: stats.programName,
+        facultyName: stats.facultyName,
+        facultyAbbreviation: stats.facultyAbbreviation,
+        totalApplicants: stats.totalApplicants,
+        totalAccepted: stats.totalAccepted,
+        competitivenessRatio: ratio,
+        acceptanceRate
+      });
+    });
+    
+    // Sort by competitiveness ratio (highest to lowest)
+    programCompetitiveness.sort((a, b) => 
+      b.competitivenessRatio - a.competitivenessRatio
+    );
+
     res.json({
       success: true,
       data: {
         year: academicYear.year,
         overallStats,
+        registrationStats, // Add this to the response
         admissionPathStats,
         facultyStats,
+        programCompetitiveness, // Add this to the response
         rawData: statistics
       }
     });
@@ -146,7 +212,7 @@ exports.getStatisticsByFaculty = async (req, res, next) => {
     
     const statistics = await AdmissionStatistics.findAll({
       where: {
-        ProgramId: {
+        programId: {  // Fix: Changed from ProgramId to programId
           [Op.in]: programIds
         }
       },
@@ -206,16 +272,16 @@ exports.getComparisonData = async (req, res, next) => {
   try {
     const { year1, year2 } = req.params;
     
-    // Get academic year IDs
-    const academicYears = await AcademicYear.findAll({
-      where: {
-        year: {
-          [Op.in]: [year1, year2]
-        }
-      }
+    // Check if both years exist in database (separately instead of using length check)
+    const year1Data = await AcademicYear.findOne({
+      where: { year: year1 }
     });
     
-    if (academicYears.length !== 2) {
+    const year2Data = await AcademicYear.findOne({
+      where: { year: year2 }
+    });
+    
+    if (!year1Data || !year2Data) {
       return res.status(404).json({
         success: false,
         message: 'Satu atau kedua tahun yang diminta tidak ditemukan'
@@ -225,11 +291,11 @@ exports.getComparisonData = async (req, res, next) => {
     // Get all admission paths
     const admissionPaths = await AdmissionPath.findAll();
     
-    // Get statistics for both years
+    // Get statistics for both years - note we need to query with both year IDs even if they're the same
     const statistics = await AdmissionStatistics.findAll({
       where: {
-        AcademicYearId: {
-          [Op.in]: academicYears.map(year => year.id)
+        academicYearId: {
+          [Op.in]: [year1Data.id, year2Data.id]
         }
       },
       include: [
@@ -242,6 +308,24 @@ exports.getComparisonData = async (req, res, next) => {
     // Split statistics by year
     const year1Stats = statistics.filter(stat => stat.AcademicYear.year === year1);
     const year2Stats = statistics.filter(stat => stat.AcademicYear.year === year2);
+    
+    // Get numeric years to determine which is newer
+    const year1Num = parseInt(year1);
+    const year2Num = parseInt(year2);
+    
+    // Determine which year is newer to calculate percentage change correctly
+    let newerYearStats, olderYearStats, newerYearNum, olderYearNum;
+    if (year1Num > year2Num) {
+      newerYearStats = year1Stats;
+      olderYearStats = year2Stats;
+      newerYearNum = year1Num;
+      olderYearNum = year2Num;
+    } else {
+      newerYearStats = year2Stats;
+      olderYearStats = year1Stats;
+      newerYearNum = year2Num;
+      olderYearNum = year1Num;
+    }
     
     // Compare overall stats
     const compareOverall = {
@@ -259,21 +343,43 @@ exports.getComparisonData = async (req, res, next) => {
       }
     };
     
-    // Calculate percentage changes
+    // Calculate percentage changes - FIXED to always go from older year to newer year
+    const olderYearApplicants = olderYearStats.reduce((sum, stat) => sum + stat.totalApplicants, 0);
+    const newerYearApplicants = newerYearStats.reduce((sum, stat) => sum + stat.totalApplicants, 0);
+    
+    const olderYearAccepted = olderYearStats.reduce((sum, stat) => sum + stat.totalAccepted, 0);
+    const newerYearAccepted = newerYearStats.reduce((sum, stat) => sum + stat.totalAccepted, 0);
+    
     compareOverall.change.totalApplicants = 
-      ((compareOverall.year2.totalApplicants - compareOverall.year1.totalApplicants) / 
-       compareOverall.year1.totalApplicants * 100).toFixed(2);
+      ((newerYearApplicants - olderYearApplicants) / 
+       olderYearApplicants * 100).toFixed(2);
        
     compareOverall.change.totalAccepted = 
-      ((compareOverall.year2.totalAccepted - compareOverall.year1.totalAccepted) / 
-       compareOverall.year1.totalAccepted * 100).toFixed(2);
+      ((newerYearAccepted - olderYearAccepted) / 
+       olderYearAccepted * 100).toFixed(2);
     
     // Compare by admission path
     const compareByPath = {};
     
     admissionPaths.forEach(path => {
-      const pathYear1 = year1Stats.filter(stat => stat.AdmissionPathId === path.id);
-      const pathYear2 = year2Stats.filter(stat => stat.AdmissionPathId === path.id);
+      const pathYear1 = year1Stats.filter(stat => stat.admissionPathId === path.id);
+      const pathYear2 = year2Stats.filter(stat => stat.admissionPathId === path.id);
+      
+      // Determine newer and older stats for this path
+      let pathOlderYearStats, pathNewerYearStats;
+      if (year1Num > year2Num) {
+        pathNewerYearStats = pathYear1;
+        pathOlderYearStats = pathYear2;
+      } else {
+        pathNewerYearStats = pathYear2;
+        pathOlderYearStats = pathYear1;
+      }
+      
+      const pathOlderApplicants = pathOlderYearStats.reduce((sum, stat) => sum + stat.totalApplicants, 0);
+      const pathNewerApplicants = pathNewerYearStats.reduce((sum, stat) => sum + stat.totalApplicants, 0);
+      
+      const pathOlderAccepted = pathOlderYearStats.reduce((sum, stat) => sum + stat.totalAccepted, 0);
+      const pathNewerAccepted = pathNewerYearStats.reduce((sum, stat) => sum + stat.totalAccepted, 0);
       
       compareByPath[path.name] = {
         year1: {
@@ -287,15 +393,12 @@ exports.getComparisonData = async (req, res, next) => {
         change: {}
       };
       
-      // Calculate percentage changes if year1 values are not zero
-      const y1Apps = compareByPath[path.name].year1.totalApplicants;
-      const y1Acc = compareByPath[path.name].year1.totalAccepted;
+      // Calculate percentage changes from older year to newer year
+      compareByPath[path.name].change.totalApplicants = pathOlderApplicants ? 
+        (((pathNewerApplicants - pathOlderApplicants) / pathOlderApplicants) * 100).toFixed(2) : 'N/A';
       
-      compareByPath[path.name].change.totalApplicants = y1Apps ? 
-        (((compareByPath[path.name].year2.totalApplicants - y1Apps) / y1Apps) * 100).toFixed(2) : 'N/A';
-      
-      compareByPath[path.name].change.totalAccepted = y1Acc ? 
-        (((compareByPath[path.name].year2.totalAccepted - y1Acc) / y1Acc) * 100).toFixed(2) : 'N/A';
+      compareByPath[path.name].change.totalAccepted = pathOlderAccepted ? 
+        (((pathNewerAccepted - pathOlderAccepted) / pathOlderAccepted) * 100).toFixed(2) : 'N/A';
     });
     
     res.json({
@@ -330,6 +433,21 @@ exports.createStatisticsEntry = async (req, res, next) => {
       kipRecipients
     } = req.body;
     
+    // Add additional validation for KIP statistics
+    if (kipApplicants > totalApplicants) {
+      return res.status(400).json({
+        success: false,
+        message: 'Jumlah pendaftar KIP tidak boleh melebihi total pendaftar'
+      });
+    }
+    
+    if (kipRecipients > kipApplicants) {
+      return res.status(400).json({
+        success: false,
+        message: 'Jumlah penerima KIP tidak boleh melebihi jumlah pendaftar KIP'
+      });
+    }
+
     // Check if entry already exists
     const existingEntry = await AdmissionStatistics.findOne({
       where: {
@@ -347,9 +465,9 @@ exports.createStatisticsEntry = async (req, res, next) => {
     }
     
     const newEntry = await AdmissionStatistics.create({
-      academicYearId: academicYearId, // Changed from AcademicYearId to academicYearId
-      programId: programId, // Changed from ProgramId to programId
-      admissionPathId: admissionPathId, // Changed from AdmissionPathId to admissionPathId
+      academicYearId: academicYearId,
+      programId: programId,
+      admissionPathId: admissionPathId,
       totalApplicants,
       maleApplicants,
       femaleApplicants,
@@ -376,6 +494,25 @@ exports.updateStatisticsEntry = async (req, res, next) => {
   try {
     const { id } = req.params;
     
+    // Add KIP validation if data is being updated
+    if (req.body.kipApplicants !== undefined && req.body.totalApplicants !== undefined) {
+      if (req.body.kipApplicants > req.body.totalApplicants) {
+        return res.status(400).json({
+          success: false,
+          message: 'Jumlah pendaftar KIP tidak boleh melebihi total pendaftar'
+        });
+      }
+    }
+    
+    if (req.body.kipRecipients !== undefined && req.body.kipApplicants !== undefined) {
+      if (req.body.kipRecipients > req.body.kipApplicants) {
+        return res.status(400).json({
+          success: false,
+          message: 'Jumlah penerima KIP tidak boleh melebihi jumlah pendaftar KIP'
+        });
+      }
+    }
+
     const entry = await AdmissionStatistics.findByPk(id);
     
     if (!entry) {

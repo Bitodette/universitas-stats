@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const config = require('../config/config');
 const { debug } = require('../utils/debugger');
+const bcrypt = require('bcryptjs'); // Add this import
 
 // Generate JWT token
 const generateToken = (id) => {
@@ -88,12 +89,24 @@ exports.login = async (req, res, next) => {
     // Extra logging to help troubleshoot
     debug('User found:', { id: user.id, email: user.email, role: user.role });
     
-    // Check if password matches
+    // Check if password matches with more detailed logging
     let isMatch = false;
     try {
       debug('Comparing passwords...');
-      isMatch = await user.matchPassword(password);
+      debug('Input password:', password);
+      debug('Stored hashed password:', user.password ? 'Present (hidden for security)' : 'Missing');
+      
+      // Use direct bcrypt comparison for debugging
+      isMatch = await bcrypt.compare(password, user.password);
+      
       debug('Password match result:', isMatch);
+      
+      if (!isMatch) {
+        debug('Password hash verification failed. This could be due to:');
+        debug('1. Incorrect password entered');
+        debug('2. Password stored in database was hashed differently');
+        debug('3. Password was manually changed and not properly hashed');
+      }
     } catch (pwError) {
       console.error('Password verification error:', pwError);
       debug('Password verification error:', pwError);

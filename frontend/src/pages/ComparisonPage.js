@@ -40,7 +40,11 @@ const ComparisonPage = () => {
 
   useEffect(() => {
     const fetchComparisonData = async () => {
-      if (!year1 || !year2 || year1 === year2) return;
+      // Only fetch if both years have valid values (not empty strings or null)
+      if (!year1 || !year2 || year1 === '' || year2 === '') {
+        setComparisonData(null); // Clear data if either year is not selected
+        return;
+      }
       
       try {
         setLoading(true);
@@ -55,13 +59,17 @@ const ComparisonPage = () => {
       }
     };
 
-    if (year1 && year2) {
-      fetchComparisonData();
-    }
+    fetchComparisonData();
   }, [year1, year2]);
 
   const handleYearChange = (setter) => (e) => {
-    setter(e.target.value);
+    const value = e.target.value;
+    setter(value); // This might set to empty string when "Pilih Tahun" is selected
+    
+    // If selecting the default "Pilih Tahun" option, clear the comparison data
+    if (!value) {
+      setComparisonData(null);
+    }
   };
 
   const renderChangeIndicator = (changeValue) => {
@@ -179,13 +187,19 @@ const ComparisonPage = () => {
             <p>Pilih dua tahun yang berbeda untuk perbandingan.</p>
           </div>
         )}
+
+        {!year1 || !year2 ? (
+          <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mt-4">
+            <p>Pilih kedua tahun untuk melihat perbandingan.</p>
+          </div>
+        ) : null}
       </div>
 
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <div className="loader"></div>
         </div>
-      ) : comparisonData ? (
+      ) : (year1 && year2 && comparisonData) ? (
         <>
           <div className="bg-white rounded-lg shadow-md p-6 mb-8">
             <h2 className="text-xl font-semibold mb-6">Perbandingan Keseluruhan</h2>

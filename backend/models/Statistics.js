@@ -87,6 +87,16 @@ const AdmissionStatistics = sequelize.define('AdmissionStatistics', {
   kipRecipients: {
     type: DataTypes.INTEGER,
     defaultValue: 0
+  },
+  registeredDocs: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    comment: 'Number of accepted students who have registered their documents'
+  },
+  registeredPayment: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    comment: 'Number of accepted students who have completed tuition payment'
   }
 }, {
   tableName: 'AdmissionStatistics'  // Make sure this matches

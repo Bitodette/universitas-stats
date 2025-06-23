@@ -1,32 +1,32 @@
 const app = require('./app');
 const config = require('./config/config');
 const { connectDB } = require('./config/db');
-const errorLogger = require('./utils/errorLogger');
+const { debug, logEnvironment } = require('./utils/debugger');
+
+// Log environment variables
+logEnvironment();
 
 // Connect to database
-connectDB().catch(err => {
-  errorLogger(err);
+connectDB();
+
+// Health check endpoint for Vercel and API verification
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    environment: process.env.NODE_ENV,
+    time: new Date().toISOString()
+  });
 });
 
-const PORT = config.port;
+// Set port
+const PORT = process.env.PORT || 5000;
 
-// Only start listening if not in serverless environment
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+// Start server if not in production/Vercel
+if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
-    console.log(`Server berjalan di port ${PORT} dalam mode ${config.env}`);
+    console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
   });
 }
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-  console.log('UNHANDLED REJECTION! 💥');
-  errorLogger(err);
-  
-  // Don't exit in production as it crashes serverless function
-  if (process.env.NODE_ENV !== 'production') {
-    process.exit(1);
-  }
-});
-
-// Export the Express app for serverless environments
+// Export for Vercel serverless deployment
 module.exports = app;

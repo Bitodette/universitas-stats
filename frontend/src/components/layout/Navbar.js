@@ -1,53 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { isAuthenticated, logout, getCurrentUser } from '../../services/authService';
+import { AuthContext } from '../../context/AuthContext';
+import { logout } from '../../services/authService';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { isAuth: authenticated, user, updateAuthStatus } = useContext(AuthContext);
   const navigate = useNavigate();
-  const authenticated = isAuthenticated();
-  const user = getCurrentUser();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
 
+  const handleLogout = () => {
+    logout();
+    updateAuthStatus();
+    navigate('/');
+    setIsMenuOpen(false);
+  };
+
   return (
-    <nav className="bg-blue-800 shadow-lg">
+    <nav className="bg-primary-700 bg-opacity-90 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <Link to="/" className="text-white font-bold text-xl">UNIVERSITAS STATS</Link>
+              <Link to="/" className="text-white font-medium text-lg">UNIVERSITAS STATS</Link>
             </div>
-            <div className="hidden sm:ml-6 sm:flex sm:items-center space-x-4">
-              <Link to="/" className="text-gray-200 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Beranda</Link>
-              <Link to="/statistics" className="text-gray-200 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Statistik</Link>
-              <Link to="/comparison" className="text-gray-200 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Perbandingan</Link>
-              <Link to="/about" className="text-gray-200 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Tentang</Link>
+            <div className="hidden sm:ml-6 sm:flex sm:items-center space-x-1">
+              <Link to="/" className="text-neutral-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-primary-600">Beranda</Link>
+              <Link to="/statistics" className="text-neutral-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-primary-600">Statistik</Link>
+              <Link to="/comparison" className="text-neutral-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-primary-600">Perbandingan</Link>
+              <Link to="/about" className="text-neutral-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-primary-600">Tentang</Link>
             </div>
           </div>
           <div className="hidden sm:ml-6 sm:flex sm:items-center">
             {authenticated ? (
               <div className="flex items-center">
-                <span className="text-gray-200 mr-3">{user.username}</span>
+                {user.username !== 'admin' && (
+                  <span className="text-neutral-100 mr-3">{user.username}</span>
+                )}
                 {user.role === 'admin' && (
-                  <Link to="/admin" className="text-gray-200 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Admin</Link>
+                  <Link to="/admin" className="text-neutral-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-primary-600 mr-2">Admin</Link>
                 )}
                 <button
                   onClick={handleLogout}
-                  className="text-gray-200 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                  className="text-neutral-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-primary-600"
                 >
                   Logout
                 </button>
               </div>
             ) : (
-              <Link to="/login" className="text-gray-200 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Login</Link>
+              <Link to="/login" className="text-neutral-100 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-primary-600">Login</Link>
             )}
           </div>
           <div className="-mr-2 flex items-center sm:hidden">
@@ -72,25 +76,28 @@ const Navbar = () => {
 
       {isMenuOpen && (
         <div className="sm:hidden">
-          <div className="px-2 pt-2 pb-3 space-y-1">
-            <Link to="/" className="text-gray-200 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Beranda</Link>
-            <Link to="/statistics" className="text-gray-200 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Statistik</Link>
-            <Link to="/comparison" className="text-gray-200 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Perbandingan</Link>
-            <Link to="/about" className="text-gray-200 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Tentang</Link>
+          <div className="px-2 pt-2 pb-3 space-y-1 bg-primary-600">
+            <Link to="/" className="text-neutral-100 hover:text-white block px-3 py-2 rounded-md text-base font-medium transition-colors hover:bg-primary-500">Beranda</Link>
+            <Link to="/statistics" className="text-neutral-100 hover:text-white block px-3 py-2 rounded-md text-base font-medium transition-colors hover:bg-primary-500">Statistik</Link>
+            <Link to="/comparison" className="text-neutral-100 hover:text-white block px-3 py-2 rounded-md text-base font-medium transition-colors hover:bg-primary-500">Perbandingan</Link>
+            <Link to="/about" className="text-neutral-100 hover:text-white block px-3 py-2 rounded-md text-base font-medium transition-colors hover:bg-primary-500">Tentang</Link>
             {authenticated ? (
               <>
+                {user.username !== 'admin' && (
+                  <span className="text-neutral-100 block px-3 py-2 rounded-md text-base font-medium">{user.username}</span>
+                )}
                 {user.role === 'admin' && (
-                  <Link to="/admin" className="text-gray-200 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Admin</Link>
+                  <Link to="/admin" className="text-neutral-100 hover:text-white block px-3 py-2 rounded-md text-base font-medium transition-colors hover:bg-primary-500">Admin</Link>
                 )}
                 <button
                   onClick={handleLogout}
-                  className="text-gray-200 hover:text-white block px-3 py-2 rounded-md text-base font-medium w-full text-left"
+                  className="text-neutral-100 hover:text-white block px-3 py-2 rounded-md text-base font-medium w-full text-left transition-colors hover:bg-primary-500"
                 >
                   Logout
                 </button>
               </>
             ) : (
-              <Link to="/login" className="text-gray-200 hover:text-white block px-3 py-2 rounded-md text-base font-medium">Login</Link>
+              <Link to="/login" className="text-neutral-100 hover:text-white block px-3 py-2 rounded-md text-base font-medium transition-colors hover:bg-primary-500">Login</Link>
             )}
           </div>
         </div>

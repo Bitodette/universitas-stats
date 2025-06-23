@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { debug, logEnvironment } = require('./utils/debugger');
+
 // Handle morgan import more gracefully
 let morgan;
 try {
@@ -14,6 +15,7 @@ const statisticsRoutes = require('./routes/statisticsRoutes');
 const authRoutes = require('./routes/authRoutes');
 const facultyRoutes = require('./routes/facultyRoutes');
 const admissionPathRoutes = require('./routes/admissionPathRoutes');
+const academicYearRoutes = require('./routes/academicYearsRoutes'); // Add this line
 
 const app = express();
 
@@ -84,6 +86,7 @@ app.use('/api/statistics', statisticsRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/faculties', facultyRoutes);
 app.use('/api/admission-paths', admissionPathRoutes);
+app.use('/api/academic-years', academicYearRoutes); // Add this line
 
 // Basic route
 app.get('/', (req, res) => {

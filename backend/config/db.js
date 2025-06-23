@@ -50,14 +50,16 @@ try {
       host: config.db.host,
       dialect: 'postgres',
       logging: config.env === 'development' ? console.log : false,
-      // Improve connection pooling for serverless environment
+      // Improve connection pooling
       pool: {
         max: 3,
         min: 0,
         acquire: 30000,
         idle: 10000,
         evict: 1000
-      }
+      },
+      // Important: NEVER use storage: null as it can cause issues with some Sequelize versions
+      // storage option is only for SQLite
     };
     
     // Add SSL for production
@@ -97,6 +99,15 @@ const connectDB = async () => {
     await sequelize.authenticate();
     console.log('Database terhubung berhasil!');
     debug('Database connection successful');
+    
+    // IMPORTANT: sync tables WITHOUT force:true to preserve data
+    // Using alter:true is safer than force - it updates tables but keeps data
+    await sequelize.sync({ 
+      force: false, 
+      alter: false // Set to true if you want to update table structure
+    });
+    console.log('Database tables synchronized (without dropping data)');
+    debug('Database tables synced without data loss');
   } catch (error) {
     console.error('Gagal terhubung ke database:', error);
     debug('Database connection failed:', error);
@@ -108,5 +119,4 @@ const connectDB = async () => {
   }
 };
 
-module.exports = { sequelize, connectDB };
 module.exports = { sequelize, connectDB };
