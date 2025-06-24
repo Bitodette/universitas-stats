@@ -7,8 +7,8 @@ let sequelize;
 try {
   debug('Initializing database connection');
 
-  // Use DATABASE_URL if present, otherwise use individual env vars
-  if (process.env.DATABASE_URL) {
+  // Only use DATABASE_URL if it exists and is not empty
+  if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') {
     debug('Using DATABASE_URL for connection');
     sequelize = new Sequelize(process.env.DATABASE_URL, {
       dialect: 'postgres',
@@ -52,7 +52,10 @@ try {
 } catch (error) {
   console.error('Error initializing Sequelize:', error.message);
   debug('Database initialization error:', error);
-  sequelize = new Sequelize('sqlite::memory:');
+  if (error.message && error.message.includes('Please install pg package manually')) {
+    console.error('FATAL: Package "pg" (PostgreSQL driver) is not installed. Please add "pg" to your dependencies.');
+  }
+  throw error;
 }
 
 const connectDB = async () => {
