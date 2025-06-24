@@ -1,86 +1,110 @@
-require('dotenv').config();
 const { Sequelize } = require('sequelize');
-const pg = require('pg');
+const config = require('./config');
 const { debug } = require('../utils/debugger');
 
-// Use DB_USERNAME if available, fallback to DB_USER for backward compatibility
-const DB_USERNAME = process.env.DB_USERNAME || process.env.DB_USER || 'postgres';
-
-debug('process.env:', {
-  DB_NAME: process.env.DB_NAME,
-  DB_USERNAME,
-  DB_PASSWORD: process.env.DB_PASSWORD,
-  DB_HOST: process.env.DB_HOST,
-  DB_PORT: process.env.DB_PORT,
-  DATABASE_URL: process.env.DATABASE_URL,
-});
+// Pastikan 'pg' dan 'pg-hstore' terinstal.
+// Jalankan: npm install pg pg-hstore
+require('pg');
 
 let sequelize;
 
-if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') {
-  debug('Using DATABASE_URL for connection');
-  sequelize = new Sequelize(process.env.DATABASE_URL, {
+try {
+  debug('Memulai inisialisasi koneksi database...');
+
+  // Opsi konfigurasi dasar untuk Sequelize
+  const dbConfig = {
     dialect: 'postgres',
-    protocol: 'postgres',
-    dialectModule: pg,
-    dialectOptions: {
+    logging: config.env === 'development' ? console.log : false,
+    pool: {
+      max: 5, // Jumlah koneksi maksimum dalam pool
+      min: 0, // Jumlah koneksi minimum dalam pool
+      acquire: 30000, // Waktu maksimum (ms) untuk mendapatkan koneksi sebelum timeout
+      idle: 10000, // Waktu maksimum (ms) koneksi bisa idle sebelum dilepaskan
+    },
+  };
+
+  // Tambahkan konfigurasi SSL khusus untuk lingkungan produksi
+  // Ini penting untuk koneksi aman ke layanan database seperti Vercel Postgres, Neon, dll.
+  if (config.env === 'production' || process.env.VERCEL === '1') {
+    debug('Menambahkan konfigurasi SSL untuk produksi.');
+    dbConfig.dialectOptions = {
       ssl: {
         require: true,
-        rejectUnauthorized: false
+        rejectUnauthorized: false, // Sesuaikan jika Anda menggunakan sertifikat CA kustom
       },
-      keepAlive: true
-    },
-    logging: false,
-    pool: {
-      max: 3,
-      min: 0,
-      acquire: 30000,
-      idle: 10000,
-      evict: 1000
-    }
-  });
-} else {
-  sequelize = new Sequelize(
-    process.env.DB_NAME || 'universitas_stats',
-    DB_USERNAME,
-    process.env.DB_PASSWORD || 'password_anda',
-    {
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 5432,
-      dialect: 'postgres',
-      dialectModule: pg,
-      logging: false,
-      pool: {
-        max: 5,
-        min: 0,
-        acquire: 30000,
-        idle: 10000
-      }
-    }
-  );
+    };
+  }
+
+  // Gunakan DATABASE_URL jika tersedia (umum di lingkungan Vercel/Heroku)
+  // Jika tidak, gunakan konfigurasi dari file config.js
+  const connectionString = process.env.DATABASE_URL || `postgres://${config.db.username}:${config.db.password}@${config.db.host}:${config.db.port}/${config.db.database}`;
+
+  if (!process.env.DATABASE_URL) {
+      debug('Menggunakan konfigurasi dari file config.js');
+  } else {
+      debug('Menggunakan DATABASE_URL dari environment variable.');
+  }
+
+  sequelize = new Sequelize(connectionString, dbConfig);
+
+} catch (error) {
+  console.error('Terjadi kesalahan saat inisialisasi Sequelize:', error.message);
+  debug('Error detail inisialisasi database:', error);
+
+  // Jika error disebabkan oleh 'pg' yang belum terinstal, berikan pesan yang jelas.
+  if (error.code === 'MODULE_NOT_FOUND' && error.message.includes("'pg'")) {
+    console.error("Paket 'pg' tidak ditemukan. Mohon instal dengan menjalankan: npm install pg pg-hstore");
+  }
+
+  // Hentikan proses jika terjadi di lingkungan non-produksi agar error cepat terdeteksi.
+  if (config.env !== 'production') {
+    process.exit(1);
+  }
+
+  // Di produksi, jangan hentikan proses. Cukup log error.
+  // Anda bisa menambahkan fallback di sini jika diperlukan.
+  // Membuat instance dummy bisa berisiko, lebih baik membiarkannya 'undefined'
+  // dan menangani koneksi yang gagal di level aplikasi.
 }
 
-let isInitialized = false;
-
+/**
+ * Mengautentikasi dan menyinkronkan koneksi database.
+ */
 const connectDB = async () => {
-  if (isInitialized) return;
+  // Hanya jalankan jika sequelize berhasil diinisialisasi
+  if (!sequelize) {
+    console.error('Koneksi database tidak dapat dilanjutkan karena Sequelize gagal diinisialisasi.');
+    return;
+  }
+
   try {
-    debug('Attempting to authenticate database connection');
     await sequelize.authenticate();
-    console.log('Database terhubung berhasil!');
-    debug('Database connection successful');
-    await sequelize.sync({ force: false, alter: false });
-    console.log('Database tables synchronized (without dropping data)');
-    debug('Database tables synced without data loss');
-    isInitialized = true;
+    console.log('Koneksi ke database berhasil dibuat.');
+    debug('Autentikasi database sukses.');
+
+    // Sinkronisasi model dengan database.
+    // 'alter: true' aman untuk pengembangan, ia akan mencoba mengubah tabel yang ada
+    // agar sesuai dengan model tanpa menghapus data.
+    // Untuk produksi, pertimbangkan menggunakan migrasi.
+    const syncOptions = {
+        alter: config.env === 'development', // Gunakan 'alter' hanya di development
+        force: false // 'force: true' akan menghapus tabel, sangat tidak disarankan
+    };
+
+    await sequelize.sync(syncOptions);
+    console.log(`Tabel database telah disinkronkan. (Mode: ${syncOptions.alter ? 'alter' : 'default'})`);
+    debug('Sinkronisasi tabel berhasil.');
+
   } catch (error) {
-    console.error('Gagal terhubung ke database:', error);
-    debug('Database connection failed:', error);
-    if (process.env.NODE_ENV !== 'production') {
+    console.error('Gagal terhubung atau sinkronisasi ke database:', error.message);
+    debug('Detail error koneksi/sinkronisasi:', error);
+
+    // Jangan keluar dari proses di lingkungan serverless (seperti Vercel)
+    // agar fungsi tidak crash dan dapat memberikan respons error.
+    if (config.env !== 'production') {
       process.exit(1);
     }
   }
 };
 
-module.exports = { sequelize, connectDB };
 module.exports = { sequelize, connectDB };

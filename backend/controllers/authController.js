@@ -7,7 +7,7 @@ const bcrypt = require('bcryptjs'); // Add this import
 // Generate JWT token
 const generateToken = (id) => {
   return jwt.sign({ id }, config.jwtSecret, {
-    expiresIn: config.jwtExpireIn // gunakan waktu dari config
+    expiresIn: config.jwtExpireIn
   });
 };
 
@@ -89,10 +89,15 @@ exports.login = async (req, res, next) => {
     // Extra logging to help troubleshoot
     debug('User found:', { id: user.id, email: user.email, role: user.role });
     
-    // Check if password matches
+    // Check if password matches with more detailed logging
     let isMatch = false;
     try {
-      isMatch = await user.matchPassword(password);
+      debug('Comparing passwords...');
+      debug('Input password:', password);
+      debug('Stored hashed password:', user.password ? 'Present (hidden for security)' : 'Missing');
+      
+      // Use direct bcrypt comparison for debugging
+      isMatch = await bcrypt.compare(password, user.password);
       
       debug('Password match result:', isMatch);
       

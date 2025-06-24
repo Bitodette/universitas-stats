@@ -32,8 +32,8 @@ const AboutPage = () => {
     };
 
   return (
-    <div className="bg-slate-50 min-h-screen">
-      <div className="container mx-auto px-4 pt-8 pb-16 space-y-8">
+    <div className="bg-slate-0 min-h-screen">
+      <div className="container mx-auto px-4 pt-8 pb-0 space-y-6">
         <div className="max-w-3xl mx-auto space-y-8">
             
           <Section title="Tentang Aplikasi" icon={ICONS.info}>

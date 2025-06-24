@@ -91,12 +91,12 @@ const AdmissionStatistics = sequelize.define('AdmissionStatistics', {
   registeredDocs: {
     type: DataTypes.INTEGER,
     defaultValue: 0,
-    comment: 'Number of accepted students who have registered their documents'
+    comment: "Number of accepted students who have registered their documents"
   },
   registeredPayment: {
     type: DataTypes.INTEGER,
     defaultValue: 0,
-    comment: 'Number of accepted students who have completed tuition payment'
+    comment: "Number of accepted students who have completed tuition payment"
   }
 }, {
   tableName: 'AdmissionStatistics'  // Make sure this matches

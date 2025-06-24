@@ -128,7 +128,7 @@ exports.getYearlyStatistics = async (req, res, next) => {
     
     const programCompetitiveness = [];
     
-    // Group statistics by program and by admission path
+    // Group statistics by program
     const programStatsMap = {};
     statistics.forEach(stat => {
       if (!programStatsMap[stat.programId]) {
@@ -137,97 +137,40 @@ exports.getYearlyStatistics = async (req, res, next) => {
           totalAccepted: 0,
           programName: stat.Program.name,
           facultyName: stat.Program.Faculty.name,
-          facultyAbbreviation: stat.Program.Faculty.abbreviation,
-          byPath: {
-            SNBP: { totalApplicants: 0, totalAccepted: 0 },
-            SNBT: { totalApplicants: 0, totalAccepted: 0 },
-            Mandiri: { totalApplicants: 0, totalAccepted: 0 }
-          }
+          facultyAbbreviation: stat.Program.Faculty.abbreviation
         };
       }
-
-      // Overall
+      
       programStatsMap[stat.programId].totalApplicants += stat.totalApplicants;
       programStatsMap[stat.programId].totalAccepted += stat.totalAccepted;
-
-      // By admission path
-      const pathName = stat.AdmissionPath.name;
-      if (programStatsMap[stat.programId].byPath[pathName]) {
-        programStatsMap[stat.programId].byPath[pathName].totalApplicants += stat.totalApplicants;
-        programStatsMap[stat.programId].byPath[pathName].totalAccepted += stat.totalAccepted;
-      }
     });
     
     // Calculate competitiveness metrics for each program
     Object.keys(programStatsMap).forEach(programId => {
       const stats = programStatsMap[programId];
-
-      // Overall
-      const competitivenessOverall = {
-        competitivenessRatio: stats.totalAccepted > 0
-          ? (stats.totalApplicants / stats.totalAccepted).toFixed(2)
-          : null,
-        acceptanceRate: stats.totalApplicants > 0
-          ? ((stats.totalAccepted / stats.totalApplicants) * 100).toFixed(2)
-          : null,
-        totalApplicants: stats.totalApplicants,
-        totalAccepted: stats.totalAccepted
-      };
-
-      // SNBP
-      const snbp = stats.byPath.SNBP;
-      const competitivenessSNBP = {
-        competitivenessRatio: snbp.totalAccepted > 0
-          ? (snbp.totalApplicants / snbp.totalAccepted).toFixed(2)
-          : null,
-        acceptanceRate: snbp.totalApplicants > 0
-          ? ((snbp.totalAccepted / snbp.totalApplicants) * 100).toFixed(2)
-          : null,
-        totalApplicants: snbp.totalApplicants,
-        totalAccepted: snbp.totalAccepted
-      };
-
-      // SNBT
-      const snbt = stats.byPath.SNBT;
-      const competitivenessSNBT = {
-        competitivenessRatio: snbt.totalAccepted > 0
-          ? (snbt.totalApplicants / snbt.totalAccepted).toFixed(2)
-          : null,
-        acceptanceRate: snbt.totalApplicants > 0
-          ? ((snbt.totalAccepted / snbt.totalApplicants) * 100).toFixed(2)
-          : null,
-        totalApplicants: snbt.totalApplicants,
-        totalAccepted: snbt.totalAccepted
-      };
-
-      // Mandiri
-      const mandiri = stats.byPath.Mandiri;
-      const competitivenessMandiri = {
-        competitivenessRatio: mandiri.totalAccepted > 0
-          ? (mandiri.totalApplicants / mandiri.totalAccepted).toFixed(2)
-          : null,
-        acceptanceRate: mandiri.totalApplicants > 0
-          ? ((mandiri.totalAccepted / mandiri.totalApplicants) * 100).toFixed(2)
-          : null,
-        totalApplicants: mandiri.totalApplicants,
-        totalAccepted: mandiri.totalAccepted
-      };
-
+      const ratio = stats.totalAccepted > 0 
+        ? (stats.totalApplicants / stats.totalAccepted).toFixed(2) 
+        : null;
+        
+      const acceptanceRate = stats.totalApplicants > 0 
+        ? ((stats.totalAccepted / stats.totalApplicants) * 100).toFixed(2) 
+        : null;
+        
       programCompetitiveness.push({
         programId,
         programName: stats.programName,
         facultyName: stats.facultyName,
         facultyAbbreviation: stats.facultyAbbreviation,
-        competitivenessOverall,
-        competitivenessSNBP,
-        competitivenessSNBT,
-        competitivenessMandiri
+        totalApplicants: stats.totalApplicants,
+        totalAccepted: stats.totalAccepted,
+        competitivenessRatio: ratio,
+        acceptanceRate
       });
     });
     
-    // Sort by overall competitiveness ratio (highest to lowest)
+    // Sort by competitiveness ratio (highest to lowest)
     programCompetitiveness.sort((a, b) => 
-      (b.competitivenessOverall.competitivenessRatio || 0) - (a.competitivenessOverall.competitivenessRatio || 0)
+      b.competitivenessRatio - a.competitivenessRatio
     );
 
     res.json({

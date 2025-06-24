@@ -31,33 +31,17 @@ console.log(`User: ${process.env.DB_USER || 'postgres'}`);
 console.log(`Password: ${'*'.repeat(8)} (hidden)`);
 
 // Explicitly create Sequelize with values
-let sequelize;
-if (process.env.DATABASE_URL) {
-  // Use DATABASE_URL with SSL for Neon/Supabase
-  sequelize = new Sequelize(process.env.DATABASE_URL, {
+const sequelize = new Sequelize(
+  process.env.DB_NAME || 'universitas_stats',
+  process.env.DB_USER || 'postgres',
+  process.env.DB_PASSWORD, // This must be a string
+  {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432', 10),
     dialect: 'postgres',
-    protocol: 'postgres',
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false
-      }
-    },
     logging: console.log
-  });
-} else {
-  sequelize = new Sequelize(
-    process.env.DB_NAME || 'universitas_stats',
-    process.env.DB_USER || 'postgres',
-    process.env.DB_PASSWORD, // This must be a string
-    {
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432', 10),
-      dialect: 'postgres',
-      logging: console.log
-    }
-  );
-}
+  }
+);
 
 // Define User model for this script
 const User = sequelize.define('User', {
@@ -113,24 +97,16 @@ const seedAdmin = async () => {
     
     if (existingAdmin) {
       console.log('Admin user already exists, updating password...');
-      // Only update password if it's different (avoid double hashing)
-      const isMatch = await bcrypt.compare(password, existingAdmin.password);
-      if (!isMatch) {
-        // Hash the new password before saving
-        const newHashedPassword = await bcrypt.hash(password, 10);
-        existingAdmin.password = newHashedPassword;
-        await existingAdmin.save();
-        console.log('Admin password updated successfully');
-      } else {
-        console.log('Admin password is already up to date');
-      }
+      existingAdmin.password = hashedPassword;
+      await existingAdmin.save();
+      console.log('Admin password updated successfully');
     } else {
       // Create new admin user
       await User.create({
         username: 'admin',
         email: 'admin@example.com',
-        password: password, // plain, will be hashed by beforeCreate
-        role: 'admin',      // pastikan role admin
+        password: hashedPassword,
+        role: 'admin',
         isActive: true
       });
       console.log('Admin user created successfully');

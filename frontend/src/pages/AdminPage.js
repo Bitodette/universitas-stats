@@ -277,8 +277,8 @@ const AdminPage = () => {
   if (yearsLoading) return <div className="bg-slate-50 min-h-screen pt-16 flex items-center justify-center"><CustomSpinner /></div>;
 
   return (
-    <div className="bg-slate-50 min-h-screen pt-16">
-        <div className="container mx-auto px-4 py-8 space-y-8">
+    <div className="bg-slate-0 min-h-screen pt-0">
+        <div className="container mx-auto px-3 py-2 space-y-6">
             <h1 className="text-4xl font-bold text-slate-800">Admin Panel</h1>
             <YearModal isOpen={yearModalOpen} onClose={() => { setYearModalOpen(false); setError(null); setNewYear(''); setIsActive(false); }} onSubmit={handleCreateYear} loading={loading} error={error} newYear={newYear} setNewYear={setNewYear} isActive={isActive} setIsActive={setIsActive} clearError={() => setError(null)} />
             <div className="bg-white rounded-lg shadow-sm p-1 flex space-x-1 max-w-md">

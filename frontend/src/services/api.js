@@ -1,10 +1,10 @@
 import axios from 'axios';
 
 // Determine API URL based on environment
-const API_URL = process.env.REACT_APP_API_URL ||
-  (process.env.NODE_ENV === 'production'
-    ? 'https://universitas-stats.vercel.app/api'
-    : 'http://localhost:5000/api');
+const API_URL = process.env.REACT_APP_API_URL || 
+                (process.env.NODE_ENV === 'production' 
+                  ? 'https://universitas-stats.vercel.app/api'
+                  : 'http://localhost:5000/api');
 
 console.log('API URL:', API_URL);
 
@@ -33,15 +33,6 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Token expired or unauthorized, force logout
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      // Optional: reload or redirect to login
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
-    }
     return Promise.reject(error);
   }
 );

@@ -21,8 +21,8 @@ const User = sequelize.define('User', {
     allowNull: false
   },
   role: {
-    type: DataTypes.ENUM('admin', 'editor', 'viewer'),
-    defaultValue: 'admin' // Ubah default ke admin agar seed admin tidak salah role
+    type: DataTypes.ENUM('admin', 'editor', 'viewer'), // Added 'viewer' role
+    defaultValue: 'viewer' // Changed default to viewer for security
   },
   isActive: {
     type: DataTypes.BOOLEAN,
@@ -32,19 +32,10 @@ const User = sequelize.define('User', {
   timestamps: true
 });
 
-// Hash password before save (create & update)
+// Hash password before save
 User.beforeCreate(async (user) => {
   const salt = await bcrypt.genSalt(10);
   user.password = await bcrypt.hash(user.password, salt);
-});
-User.beforeUpdate(async (user) => {
-  if (user.changed('password')) {
-    // Only hash if not already hashed (bcrypt hash starts with $2)
-    if (!user.password.startsWith('$2')) {
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(user.password, salt);
-    }
-  }
 });
 
 // Check if password matches
