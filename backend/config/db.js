@@ -7,7 +7,7 @@ let sequelize;
 try {
   debug('Initializing database connection');
 
-  // Only use DATABASE_URL if it exists and is not empty
+  // Use DATABASE_URL for Vercel/production (with SSL)
   if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') {
     debug('Using DATABASE_URL for connection');
     sequelize = new Sequelize(process.env.DATABASE_URL, {
