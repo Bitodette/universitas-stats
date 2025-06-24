@@ -7,7 +7,7 @@ let sequelize;
 try {
   debug('Initializing database connection');
 
-  // Use DATABASE_URL for Vercel/production (with SSL)
+  // Use DATABASE_URL for Neon/production
   if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') {
     debug('Using DATABASE_URL for connection');
     sequelize = new Sequelize(process.env.DATABASE_URL, {
@@ -30,7 +30,7 @@ try {
       }
     });
   } else {
-    // Use local connection details
+    // Fallback to local config (optional)
     sequelize = new Sequelize(
       process.env.DB_NAME || 'universitas_stats',
       process.env.DB_USER || 'postgres',

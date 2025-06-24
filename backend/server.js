@@ -28,30 +28,25 @@ async function ensureAdminExists() {
 // Log environment variables
 logEnvironment();
 
-// Connect to database
-connectDB().then(() => {
-  // Ensure admin user exists after DB is ready
-  ensureAdminExists();
-});
-
-// Health check endpoint for Vercel and API verification
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    environment: process.env.NODE_ENV,
-    time: new Date().toISOString()
-  });
-});
-
-// Set port
-const PORT = process.env.PORT || 5000;
-
-// Start server if not in production/Vercel
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-  });
+// Connect to database and ensure admin exists
+async function init() {
+  try {
+    await connectDB();
+    await ensureAdminExists();
+    // Start server only if not in production (Vercel will handle in prod)
+    const PORT = process.env.PORT || 5000;
+    if (process.env.NODE_ENV !== 'production') {
+      app.listen(PORT, () => {
+        console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+      });
+    }
+  } catch (err) {
+    console.error('Fatal error during server initialization:', err);
+    process.exit(1);
+  }
 }
+
+init();
 
 // Export for Vercel serverless deployment
 module.exports = app;
