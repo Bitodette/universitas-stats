@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { Sequelize } = require('sequelize');
 const { debug } = require('../utils/debugger');
+const pg = require('pg'); // Tambahkan ini
 
 let sequelize;
 
@@ -13,6 +14,7 @@ try {
     sequelize = new Sequelize(process.env.DATABASE_URL, {
       dialect: 'postgres',
       protocol: 'postgres',
+      dialectModule: pg, // Tambahkan ini
       dialectOptions: {
         ssl: {
           require: true,
@@ -39,6 +41,7 @@ try {
         host: process.env.DB_HOST || 'localhost',
         port: process.env.DB_PORT || 5432,
         dialect: 'postgres',
+        dialectModule: pg, // Tambahkan ini
         logging: false,
         pool: {
           max: 5,
