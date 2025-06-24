@@ -1,7 +1,7 @@
 const serverless = require('serverless-http');
 const app = require('../app');
-const { connectDB } = require('../config/db');
 
+module.exports = serverless(app);
 connectDB(); // Only run once at cold start
 
 module.exports = serverless(app);
