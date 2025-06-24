@@ -61,7 +61,10 @@ try {
   throw error;
 }
 
+let isInitialized = false;
+
 const connectDB = async () => {
+  if (isInitialized) return; // Prevent re-initialization on every request
   try {
     debug('Attempting to authenticate database connection');
     await sequelize.authenticate();
@@ -70,6 +73,7 @@ const connectDB = async () => {
     await sequelize.sync({ force: false, alter: false });
     console.log('Database tables synchronized (without dropping data)');
     debug('Database tables synced without data loss');
+    isInitialized = true;
   } catch (error) {
     console.error('Gagal terhubung ke database:', error);
     debug('Database connection failed:', error);
