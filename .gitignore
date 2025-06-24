@@ -17,12 +17,6 @@ node_modules
 .env.development.local
 .env.test.local
 .env.development
-.env.production
-/frontend/.env
-/frontend/.env.local
-/backend/.env
-/backend/.env.local
-/backend/.env.production
 
 # Debug logs
 npm-debug.log*

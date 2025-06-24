@@ -4,7 +4,8 @@ module.exports = {
   env: process.env.NODE_ENV || 'development',
   port: process.env.PORT || 5000,
   jwtSecret: process.env.JWT_SECRET || 'rahasia_aman',
-  jwtExpireIn: process.env.JWT_EXPIRE || '30d',
+  jwtExpireIn: process.env.JWT_EXPIRE || '1h', // default 1 jam jika tidak di-set
+  databaseUrl: process.env.DATABASE_URL, // Add this line
   db: {
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,

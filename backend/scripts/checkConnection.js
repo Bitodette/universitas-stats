@@ -1,4 +1,5 @@
-require('dotenv').config();
+// Load .env from backend folder explicitly
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const { sequelize } = require('../config/db');
 const { debug, logEnvironment } = require('../utils/debugger');
 
