@@ -90,7 +90,7 @@ app.use('/api/academic-years', academicYearRoutes); // Add this line
 
 // Basic route
 app.get('/', (req, res) => {
-  res.send('API untuk Universitas Statistik berjalan...');
+  res.send('API jalan...');
 });
 
 // Custom error handler with improved logging
